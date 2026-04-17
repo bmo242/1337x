@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>1337x Smart Search</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Syne:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d0d0f;
+    --surface: #141418;
+    --surface2: #1c1c22;
+    --border: rgba(255,255,255,0.07);
+    --border-hover: rgba(255,255,255,0.14);
+    --accent: #00e5a0;
+    --accent-dim: rgba(0,229,160,0.12);
+    --accent-dim2: rgba(0,229,160,0.06);
+    --text: #f0f0f0;
+    --text-muted: #888;
+    --text-dim: #555;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'Syne', sans-serif;
+  }
+
+  html { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; }
+
+  body {
+    min-height: 100vh;
+    background:
+      radial-gradient(ellipse 60% 40% at 80% 10%, rgba(0,229,160,0.06) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 30% at 10% 80%, rgba(0,180,255,0.04) 0%, transparent 60%),
+      var(--bg);
+  }
+
+  .layout {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 3rem 1.5rem 5rem;
+  }
+
+  /* Header */
+  header {
+    margin-bottom: 2.5rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .badge {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    background: var(--accent-dim2);
+    border: 1px solid rgba(0,229,160,0.2);
+    border-radius: 3px;
+    padding: 3px 8px;
+    margin-bottom: 1rem;
+    text-transform: uppercase;
+  }
+
+  h1 {
+    font-size: clamp(28px, 5vw, 42px);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    color: var(--text);
+    margin-bottom: 0.5rem;
+  }
+
+  h1 span { color: var(--accent); }
+
+  .tagline {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.6;
+  }
+
+  /* Search input */
+  .search-wrap {
+    margin-bottom: 2rem;
+  }
+
+  .search-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+    display: block;
+  }
+
+  .search-input-row {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+  }
+
+  #title {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 16px;
+    font-family: var(--sans);
+    font-size: 16px;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  #title::placeholder { color: var(--text-dim); }
+
+  #title:focus {
+    border-color: rgba(0,229,160,0.4);
+    box-shadow: 0 0 0 3px rgba(0,229,160,0.08);
+  }
+
+  /* Filter panels */
+  .filters { display: flex; flex-direction: column; gap: 1.25rem; margin-bottom: 2rem; }
+
+  .filter-group {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem 1.125rem;
+    transition: border-color 0.2s;
+  }
+
+  .filter-group:hover { border-color: var(--border-hover); }
+
+  .group-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+    display: block;
+  }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+  .chip {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 5px 11px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    background: transparent;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.02em;
+    line-height: 1;
+  }
+
+  .chip:hover {
+    border-color: var(--border-hover);
+    color: var(--text);
+    background: var(--surface2);
+  }
+
+  .chip.on {
+    background: var(--accent-dim);
+    border-color: rgba(0,229,160,0.35);
+    color: var(--accent);
+  }
+
+  /* Quick combos */
+  .combo-wrap { margin-bottom: 1.5rem; }
+
+  .combos {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 8px;
+  }
+
+  .combo {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.15s;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .combo:hover {
+    border-color: rgba(0,229,160,0.35);
+    background: var(--accent-dim2);
+  }
+
+  .combo.active {
+    border-color: rgba(0,229,160,0.5);
+    background: var(--accent-dim);
+  }
+
+  .combo-name {
+    font-family: var(--sans);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    display: block;
+  }
+
+  .combo.active .combo-name { color: var(--accent); }
+
+  .combo-desc {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    display: block;
+    line-height: 1.5;
+  }
+
+  .combo.active .combo-desc { color: rgba(0,229,160,0.6); }
+
+
+  .preview-wrap {
+    margin-bottom: 2rem;
+  }
+
+  .preview-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem 1.125rem;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.8;
+    word-break: break-all;
+    min-height: 60px;
+    transition: border-color 0.2s;
+    position: relative;
+  }
+
+  .preview-box .site-part { color: var(--accent); font-weight: 500; }
+  .preview-box .title-part { color: var(--text); }
+  .preview-box .filter-part { color: #7eb8ff; }
+  .preview-box .empty { color: var(--text-dim); font-style: italic; }
+
+  .copy-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 4px 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .copy-btn:hover { color: var(--accent); border-color: rgba(0,229,160,0.3); }
+  .copy-btn.copied { color: var(--accent); }
+
+  /* Launch buttons */
+  .launch {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+  }
+
+  .launch-btn {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.05em;
+    padding: 13px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-muted);
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .launch-btn .engine-name { font-size: 13px; color: var(--text); font-weight: 500; }
+  .launch-btn .engine-hint { font-size: 10px; color: var(--text-dim); }
+
+  .launch-btn:hover {
+    border-color: rgba(0,229,160,0.3);
+    background: var(--accent-dim2);
+    color: var(--text);
+  }
+
+  .launch-btn.primary {
+    border-color: rgba(0,229,160,0.35);
+    background: var(--accent-dim);
+    color: var(--accent);
+  }
+
+  .launch-btn.primary .engine-name { color: var(--accent); }
+  .launch-btn.primary .engine-hint { color: rgba(0,229,160,0.5); }
+
+  .launch-btn.primary:hover {
+    background: rgba(0,229,160,0.18);
+  }
+
+  /* Footer */
+  footer {
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  @media (max-width: 500px) {
+    .launch { grid-template-columns: 1fr; }
+    .search-input-row { flex-direction: column; }
+    footer { flex-direction: column; align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <header>
+    <div class="badge">Search Tool</div>
+    <h1>1337x <span>Smart</span> Search</h1>
+    <p class="tagline">Build targeted Google queries with quality, size &amp; category filters — then fire.</p>
+  </header>
+
+  <!-- Title input -->
+  <div class="search-wrap">
+    <span class="search-label">Content title</span>
+    <div class="search-input-row">
+      <input type="text" id="title" placeholder="e.g. Inception, Breaking Bad, Elden Ring…" oninput="update()" autocomplete="off" spellcheck="false" />
+    </div>
+  </div>
+
+  <!-- Quick combos -->
+  <div class="combo-wrap">
+    <span class="search-label">Quick combos</span>
+    <div class="combos">
+      <button class="combo" onclick="applyCombo('small')" title="YTS · 1080p · HEVC · &lt; 2GB">
+        <span class="combo-name">Small &amp; Sharp</span>
+        <span class="combo-desc">YTS · 1080p · HEVC · &lt;2GB</span>
+      </button>
+      <button class="combo" onclick="applyCombo('cinema')" title="BluRay · 1080p · DTS or Atmos">
+        <span class="combo-name">Cinema Quality</span>
+        <span class="combo-desc">BluRay · 1080p · DTS/Atmos</span>
+      </button>
+      <button class="combo" onclick="applyCombo('4k')" title="4K · REMUX · Atmos">
+        <span class="combo-name">4K Overkill</span>
+        <span class="combo-desc">4K · REMUX · Atmos · &gt;10GB</span>
+      </button>
+      <button class="combo" onclick="applyCombo('tv')" title="TV · WEB-DL · 1080p">
+        <span class="combo-name">Binge TV</span>
+        <span class="combo-desc">TV · WEB-DL · 1080p</span>
+      </button>
+      <button class="combo" onclick="applyCombo('quick')" title="720p · AAC · &lt;1GB — fastest download">
+        <span class="combo-name">Quick Download</span>
+        <span class="combo-desc">720p · AAC · &lt;1GB</span>
+      </button>
+      <button class="combo" onclick="applyCombo('reset')" title="Clear all filters">
+        <span class="combo-name">Reset</span>
+        <span class="combo-desc">clear all filters</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters">
+
+    <div class="filter-group">
+      <span class="group-label">Video quality</span>
+      <div class="chips" id="quality-chips">
+        <button class="chip on" onclick="toggle(this,'quality')">Any</button>
+        <button class="chip" onclick="toggle(this,'quality')">4K / 2160p</button>
+        <button class="chip" onclick="toggle(this,'quality')">1080p</button>
+        <button class="chip" onclick="toggle(this,'quality')">720p</button>
+        <button class="chip" onclick="toggle(this,'quality')">BluRay</button>
+        <button class="chip" onclick="toggle(this,'quality')">WEB-DL</button>
+        <button class="chip" onclick="toggle(this,'quality')">HDRip</button>
+        <button class="chip" onclick="toggle(this,'quality')">HEVC</button>
+        <button class="chip" onclick="toggle(this,'quality')">x265</button>
+        <button class="chip" onclick="toggle(this,'quality')">x264</button>
+        <button class="chip" onclick="toggle(this,'quality')">REMUX</button>
+      </div>
+    </div>
+
+    <div class="filter-group">
+      <span class="group-label">File size</span>
+      <div class="chips" id="size-chips">
+        <button class="chip on" onclick="toggle(this,'size')">Any size</button>
+        <button class="chip" onclick="toggle(this,'size')">&lt; 1 GB</button>
+        <button class="chip" onclick="toggle(this,'size')">&lt; 2 GB</button>
+        <button class="chip" onclick="toggle(this,'size')">1–3 GB</button>
+        <button class="chip" onclick="toggle(this,'size')">3–10 GB</button>
+        <button class="chip" onclick="toggle(this,'size')">&gt; 10 GB</button>
+      </div>
+    </div>
+
+    <div class="filter-group">
+      <span class="group-label">Encode group — smaller, reliable releases</span>
+      <div class="chips" id="group-chips">
+        <button class="chip on" onclick="toggle(this,'group')">Any</button>
+        <button class="chip" onclick="toggle(this,'group')">YTS</button>
+        <button class="chip" onclick="toggle(this,'group')">YIFY</button>
+        <button class="chip" onclick="toggle(this,'group')">RARBG</button>
+        <button class="chip" onclick="toggle(this,'group')">FGT</button>
+        <button class="chip" onclick="toggle(this,'group')">CMRG</button>
+        <button class="chip" onclick="toggle(this,'group')">EVO</button>
+        <button class="chip" onclick="toggle(this,'group')">GECKOS</button>
+        <button class="chip" onclick="toggle(this,'group')">DEFLATE</button>
+        <button class="chip" onclick="toggle(this,'group')">GalaxyRG</button>
+        <button class="chip" onclick="toggle(this,'group')">MkvCage</button>
+        <button class="chip" onclick="toggle(this,'group')">TIGOLE</button>
+        <button class="chip" onclick="toggle(this,'group')">SPARKS</button>
+      </div>
+    </div>
+
+    <div class="filter-group">
+      <span class="group-label">Category</span>
+      <div class="chips" id="cat-chips">
+        <button class="chip on" onclick="toggle(this,'cat')">Any</button>
+        <button class="chip" onclick="toggle(this,'cat')">Movies</button>
+        <button class="chip" onclick="toggle(this,'cat')">TV</button>
+        <button class="chip" onclick="toggle(this,'cat')">Anime</button>
+        <button class="chip" onclick="toggle(this,'cat')">Documentaries</button>
+        <button class="chip" onclick="toggle(this,'cat')">Games</button>
+        <button class="chip" onclick="toggle(this,'cat')">Software</button>
+        <button class="chip" onclick="toggle(this,'cat')">Music</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Query preview -->
+  <div class="preview-wrap">
+    <span class="search-label">Query preview</span>
+    <div class="preview-box" id="preview">
+      <button class="copy-btn" onclick="copyQuery()" id="copy-btn">copy</button>
+      <span class="empty">Enter a title to build your query…</span>
+    </div>
+  </div>
+
+  <!-- Launch buttons -->
+  <div class="launch">
+    <button class="launch-btn primary" onclick="openSearch('google')">
+      <span class="engine-name">Google ↗</span>
+      <span class="engine-hint">20 results</span>
+    </button>
+    <button class="launch-btn" onclick="openSearch('ddg')">
+      <span class="engine-name">DuckDuckGo ↗</span>
+      <span class="engine-hint">private search</span>
+    </button>
+    <button class="launch-btn" onclick="openSearch('bing')">
+      <span class="engine-name">Bing ↗</span>
+      <span class="engine-hint">alternate index</span>
+    </button>
+  </div>
+
+  <footer>
+    <span>1337x Smart Search — personal tool</span>
+    <span id="footer-query" style="color: var(--text-dim); max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
+  </footer>
+
+</div>
+
+<script>
+  const sizeQueryMap = {
+    '< 1 GB':   '(700mb OR 800mb OR 900mb OR "1gb")',
+    '< 2 GB':   '(700mb OR 800mb OR 900mb OR "1gb" OR "1.5gb" OR "2gb")',
+    '1–3 GB':   '("1gb" OR "1.5gb" OR "2gb" OR "2.5gb" OR "3gb")',
+    '3–10 GB':  '("4gb" OR "5gb" OR "6gb" OR "7gb" OR "8gb" OR "9gb" OR "10gb")',
+    '> 10 GB':  '("10gb" OR "15gb" OR "20gb" OR "25gb")'
+  };
+
+  const comboDefs = {
+    small:  { quality: ['1080p','HEVC'], size: ['< 2 GB'],  group: ['YTS'],  cat: [] },
+    cinema: { quality: ['1080p','BluRay'], size: [],        group: [],       cat: ['Movies'] },
+    '4k':   { quality: ['4K / 2160p','REMUX'], size: ['> 10 GB'], group: [], cat: [] },
+    tv:     { quality: ['1080p','WEB-DL'], size: [],        group: [],       cat: ['TV'] },
+    quick:  { quality: ['720p'],    size: ['< 1 GB'],       group: ['YTS'],  cat: [] },
+    reset:  { quality: [],          size: [],               group: [],       cat: [] }
+  };
+
+  function setChips(groupId, values, anyLabel) {
+    const chips = [...document.querySelectorAll('#' + groupId + '-chips .chip')];
+    chips.forEach(c => c.classList.remove('on'));
+    if (values.length === 0) {
+      const anyChip = chips.find(c => c.textContent.trim() === anyLabel);
+      if (anyChip) anyChip.classList.add('on');
+    } else {
+      values.forEach(v => {
+        const chip = chips.find(c => c.textContent.trim() === v);
+        if (chip) chip.classList.add('on');
+      });
+    }
+  }
+
+  function applyCombo(name) {
+    const def = comboDefs[name];
+    if (!def) return;
+    setChips('quality', def.quality, 'Any');
+    setChips('size',    def.size,    'Any size');
+    setChips('group',   def.group,   'Any');
+    setChips('cat',     def.cat,     'Any');
+    document.querySelectorAll('.combo').forEach(c => c.classList.remove('active'));
+    if (name !== 'reset') {
+      event.currentTarget.classList.add('active');
+    }
+    update();
+  }
+
+
+  function getSelected(groupId) {
+    return [...document.querySelectorAll('#' + groupId + '-chips .chip.on')]
+      .map(c => c.textContent.trim())
+      .filter(t => t !== 'Any' && t !== 'Any size');
+  }
+
+  function toggle(el, group) {
+    const anyLabel = group === 'size' ? 'Any size' : 'Any';
+    const isAny = el.textContent.trim() === anyLabel;
+    const chips = [...el.parentElement.querySelectorAll('.chip')];
+    if (isAny) {
+      chips.forEach(c => c.classList.remove('on'));
+      el.classList.add('on');
+    } else {
+      chips.find(c => c.textContent.trim() === anyLabel)?.classList.remove('on');
+      el.classList.toggle('on');
+      const anyOn = chips.some(c => c.classList.contains('on') && c.textContent.trim() !== anyLabel);
+      if (!anyOn) chips.find(c => c.textContent.trim() === anyLabel)?.classList.add('on');
+    }
+    update();
+    document.querySelectorAll('.combo').forEach(c => c.classList.remove('active'));
+  }
+
+  function buildQuery() {
+    const title   = document.getElementById('title').value.trim();
+    const quality = getSelected('quality-chips');
+    const size    = getSelected('size-chips');
+    const group   = getSelected('group-chips');
+    const cat     = getSelected('cat-chips');
+
+    let parts = ['site:1377x.to'];
+    if (title)          parts.push('"' + title + '"');
+    if (quality.length) {
+      const cleaned = quality.map(v => v.replace(' / ', ' OR '));
+      parts.push(quality.length === 1 ? cleaned[0] : '(' + cleaned.join(' OR ') + ')');
+    }
+    if (size.length === 1 && sizeQueryMap[size[0]]) parts.push(sizeQueryMap[size[0]]);
+    if (group.length)   parts.push(group.length === 1 ? group[0] : '(' + group.join(' OR ') + ')');
+    if (cat.length)     parts.push(cat.length === 1 ? cat[0] : '(' + cat.join(' OR ') + ')');
+
+    return parts.join(' ');
+  }
+
+  function update() {
+    const title   = document.getElementById('title').value.trim();
+    const quality = getSelected('quality-chips');
+    const size    = getSelected('size-chips');
+    const group   = getSelected('group-chips');
+    const cat     = getSelected('cat-chips');
+    const preview = document.getElementById('preview');
+    const footer  = document.getElementById('footer-query');
+
+    if (!title) {
+      preview.innerHTML = '<button class="copy-btn" onclick="copyQuery()" id="copy-btn">copy</button><span class="empty">Enter a title to build your query…</span>';
+      footer.textContent = '';
+      return;
+    }
+
+    const q = buildQuery();
+    let html = '<button class="copy-btn" onclick="copyQuery()" id="copy-btn">copy</button>';
+    html += '<span class="site-part">site:1377x.to</span> ';
+    html += '<span class="title-part">"' + title + '"</span>';
+
+    const filters = [];
+    if (quality.length) filters.push(quality.join(', '));
+    if (size.length)    filters.push(size[0]);
+    if (group.length)   filters.push(group.join(', '));
+    if (cat.length)     filters.push(cat.join(', '));
+
+    if (filters.length) {
+      html += ' <span class="filter-part">' + filters.join(' · ') + '</span>';
+    }
+
+    preview.innerHTML = html;
+    footer.textContent = q;
+  }
+
+  function openSearch(engine) {
+    const title = document.getElementById('title').value.trim();
+    if (!title) { document.getElementById('title').focus(); return; }
+    const q = buildQuery();
+    const enc = encodeURIComponent(q);
+    const urls = {
+      google: 'https://www.google.com/search?q=' + enc + '&num=20',
+      ddg:    'https://duckduckgo.com/?q=' + enc,
+      bing:   'https://www.bing.com/search?q=' + enc
+    };
+    window.open(urls[engine], '_blank');
+  }
+
+  function copyQuery() {
+    const title = document.getElementById('title').value.trim();
+    if (!title) return;
+    const q = buildQuery();
+    navigator.clipboard.writeText(q).then(() => {
+      const btn = document.getElementById('copy-btn');
+      if (btn) { btn.textContent = 'copied!'; btn.classList.add('copied'); setTimeout(() => { btn.textContent = 'copy'; btn.classList.remove('copied'); }, 1800); }
+    });
+  }
+
+  document.getElementById('title').addEventListener('keydown', e => {
+    if (e.key === 'Enter') openSearch('google');
+  });
+</script>
+</body>
+</html>
