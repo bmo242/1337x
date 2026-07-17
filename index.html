@@ -354,17 +354,6 @@
     <button class="chip" onclick="toggleCat(this, 'Music')">Music</button>
   </div>
 
-  <div class="filter-row">
-    <span class="filter-label">Max size:</span>
-    <button class="chip on" onclick="toggleSize(this, 0)">Any</button>
-    <button class="chip" onclick="toggleSize(this, 0.7)">700 MB</button>
-    <button class="chip" onclick="toggleSize(this, 1)">1 GB</button>
-    <button class="chip" onclick="toggleSize(this, 2)">2 GB</button>
-    <button class="chip" onclick="toggleSize(this, 4)">4 GB</button>
-    <button class="chip" onclick="toggleSize(this, 10)">10 GB</button>
-    <button class="chip" onclick="toggleSize(this, 20)">20 GB</button>
-  </div>
-
   <div class="status" id="status"></div>
   <div class="results" id="results"></div>
 
@@ -373,10 +362,13 @@
     <pre id="debug" style="font-family:var(--mono);font-size:10px;color:var(--text-muted);background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:12px;margin-top:8px;overflow:auto;max-height:400px;white-space:pre-wrap;word-break:break-all;"></pre>
   </details>
 
-  <footer>1337x External Search — results fetched live from 1337x.to</footer>
+  <footer>1337x External Search — results fetched live from active proxy domain.</footer>
 </div>
 
 <script>
+  // Change this to whatever mirror domain works best on your ISP / region
+  const ACTIVE_MIRROR = "https://1337x.to";
+
   // API Key management
   function getKey() {
     return localStorage.getItem('gemini_api_key') || '';
@@ -405,33 +397,12 @@
     }
   });
 
-  let selectedCat  = '';
-  let maxSizeGb    = 0; // 0 = no limit
+  let selectedCat = '';
 
   function toggleCat(el, cat) {
-    document.querySelectorAll('.filter-row:first-of-type .chip').forEach(c => c.classList.remove('on'));
+    document.querySelectorAll('.filter-row .chip').forEach(c => c.classList.remove('on'));
     el.classList.add('on');
     selectedCat = cat;
-  }
-
-  function toggleSize(el, gb) {
-    document.querySelectorAll('.filter-row:last-of-type .chip').forEach(c => c.classList.remove('on'));
-    el.classList.add('on');
-    maxSizeGb = gb;
-  }
-
-  // Parse a size string like "1.8 GB", "811.1 MB", "5.5 GB" into GB float
-  function parseSizeGb(sizeStr) {
-    if (!sizeStr) return null;
-    const match = sizeStr.match(/([\d.]+)\s*(GB|MB|KB|TB)/i);
-    if (!match) return null;
-    const val  = parseFloat(match[1]);
-    const unit = match[2].toUpperCase();
-    if (unit === 'TB') return val * 1024;
-    if (unit === 'GB') return val;
-    if (unit === 'MB') return val / 1024;
-    if (unit === 'KB') return val / (1024 * 1024);
-    return null;
   }
 
   document.getElementById('query').addEventListener('keydown', e => {
@@ -440,8 +411,8 @@
 
   function buildSearchUrl(q, cat, page) {
     const encoded = encodeURIComponent(q).replace(/%20/g, '+');
-    if (cat) return `https://www.1377x.to/category-search/${encoded}/${cat}/${page}/`;
-    return `https://www.1377x.to/search/${encoded}/${page}/`;
+    if (cat) return `${ACTIVE_MIRROR}/category-search/${encoded}/${cat}/${page}/`;
+    return `${ACTIVE_MIRROR}/search/${encoded}/${page}/`;
   }
 
   async function doSearch() {
@@ -469,92 +440,88 @@
       return;
     }
 
-    const prompt = `Search: 1377x.to: ${q}${selectedCat ? ' ' + selectedCat : ''}
+    const prompt = `Search Google for torrent listings on 1337x using this exact structure: "site:1337x.to ${q}${selectedCat ? ' ' + selectedCat : ''}"
 
-Return ONLY a JSON array of the top 10 torrent results from 1377x.to. No text before or after the array.
-
-Each item: {"name":"","url":"https://www.1377x.to/torrent/.../","seeders":0,"leechers":0,"size":""}
-
-Exactly 10 items max. JSON array only, starting with [`;
+From the search engine results, extract all available torrent entries. For each item, extract its metadata and provide ONLY the relative URI path (starting with a slash) for the torrent page.`;
 
     try {
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
             tools: [{ google_search: {} }],
-            generationConfig: {
-              temperature: 0,
-              maxOutputTokens: 3000,
-              thinkingConfig: { thinkingBudget: 0 }
+            generationConfig: { 
+              temperature: 0.1,
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: "ARRAY",
+                items: {
+                  type: "OBJECT",
+                  properties: {
+                    name: { type: "STRING" },
+                    url: { type: "STRING" },
+                    seeders: { type: "INTEGER" },
+                    leechers: { type: "INTEGER" },
+                    size: { type: "STRING" },
+                    date: { type: "STRING" },
+                    uploader: { type: "STRING" }
+                  },
+                  required: ["name", "url"]
+                }
+              }
             }
           })
         }
       );
 
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error?.message || `HTTP error! status: ${response.status}`);
+      }
+
       const data = await response.json();
       if (debugEl) debugEl.textContent = JSON.stringify(data, null, 2);
-      if (data.error) throw new Error(data.error.message);
 
-      // Gemini 3.5 Flash puts thoughtSignature on same part as text — just grab all text parts
-      const parts = data.candidates?.[0]?.content?.parts || [];
-      const text = parts
-        .filter(p => p.text)
-        .map(p => p.text)
-        .join('') || '';
-
-      if (!text) throw new Error('Empty response from Gemini — check debug panel');
+      const text = data.candidates?.[0]?.content?.parts
+        ?.filter(p => p.text)
+        ?.map(p => p.text)
+        ?.join('') || '';
 
       let torrents = [];
       try {
-        const clean = text.replace(/```json|```/g, '').trim();
-        const match = clean.match(/\[[\s\S]*\]/);
-        if (match) {
-          torrents = JSON.parse(match[0]);
-        } else {
-          throw new Error('No JSON array found in response');
-        }
+        torrents = JSON.parse(text.trim());
       } catch(e) {
-        throw new Error(`Parse failed: ${e.message}`);
+        throw new Error('Could not parse JSON response from the model schema.');
       }
 
       status.className = 'status';
 
-      // Apply size filter client-side
-      let filtered = torrents;
-      if (maxSizeGb > 0) {
-        filtered = torrents.filter(t => {
-          const gb = parseSizeGb(t.size);
-          return gb === null || gb <= maxSizeGb; // keep unknowns
-        });
-      }
-
-      if (!filtered.length) {
-        const sizeLabel = maxSizeGb > 0 ? ` under ${maxSizeGb >= 1 ? maxSizeGb + ' GB' : (maxSizeGb * 1024) + ' MB'}` : '';
-        status.textContent = `No results found for "${q}"${sizeLabel}`;
+      if (!torrents.length) {
+        status.textContent = `No results found for "${q}"`;
         resultsEl.innerHTML = `<div class="empty">
-          <div style="margin-bottom:12px">No results match your filters — try a wider size limit.</div>
+          <div style="margin-bottom:12px">No results — try a different term or category.</div>
           <a href="${searchUrl}" target="_blank" style="color:var(--accent);font-family:var(--mono);font-size:12px;">Open search on 1337x directly ↗</a>
         </div>`;
         btn.disabled = false;
         return;
       }
 
-      const sizeNote = maxSizeGb > 0 ? ` (size filter: ≤ ${maxSizeGb >= 1 ? maxSizeGb + ' GB' : (maxSizeGb * 1024) + ' MB'}, showing ${filtered.length} of ${torrents.length})` : '';
-      status.textContent = `${filtered.length} result${filtered.length !== 1 ? 's' : ''} for "${q}"${sizeNote}`;
+      status.textContent = `${torrents.length} result${torrents.length !== 1 ? 's' : ''} for "${q}"`;
 
-      resultsEl.innerHTML = filtered.map((t, i) => `
+      resultsEl.innerHTML = torrents.map((t, i) => `
         <div class="result-card">
           <div>
             <div class="result-num">#${i + 1}</div>
             <div class="result-name">
-              <a href="${escHtml(t.url)}" target="_blank" rel="noopener">${escHtml(t.name)}</a>
+              <a href="${ACTIVE_MIRROR}${escHtml(t.url)}" target="_blank" rel="noopener">${escHtml(t.name)}</a>
             </div>
             <div class="result-meta">
-              ${t.size ? `<span class="meta-pill size">⬛ ${escHtml(t.size)}</span>` : ''}
+              ${t.size     ? `<span class="meta-pill size">⬛ ${escHtml(t.size)}</span>` : ''}
+              ${t.date     ? `<span class="meta-pill">🕐 ${escHtml(t.date)}</span>` : ''}
+              ${t.uploader ? `<span class="meta-pill uploader">👤 ${escHtml(t.uploader)}</span>` : ''}
             </div>
           </div>
           <div class="seeds-leech">
@@ -571,10 +538,10 @@ Exactly 10 items max. JSON array only, starting with [`;
         <div style="margin-bottom:12px">Could not fetch results.</div>
         <a href="${searchUrl}" target="_blank" style="color:var(--accent);font-family:var(--mono);font-size:12px;">Open search on 1337x directly ↗</a>
       </div>`;
-      if (debugEl) debugEl.textContent = (debugEl.textContent || '') + '\n\nERROR: ' + (err.stack || err.message);
-    } finally {
-      btn.disabled = false;
+      if (debugEl) debugEl.textContent = err.stack || err.message;
     }
+
+    btn.disabled = false;
   }
 
   function escHtml(s) {
