@@ -354,6 +354,17 @@
     <button class="chip" onclick="toggleCat(this, 'Music')">Music</button>
   </div>
 
+  <div class="filter-row">
+    <span class="filter-label">Max size:</span>
+    <button class="chip on" onclick="toggleSize(this, 0)">Any</button>
+    <button class="chip" onclick="toggleSize(this, 0.7)">700 MB</button>
+    <button class="chip" onclick="toggleSize(this, 1)">1 GB</button>
+    <button class="chip" onclick="toggleSize(this, 2)">2 GB</button>
+    <button class="chip" onclick="toggleSize(this, 4)">4 GB</button>
+    <button class="chip" onclick="toggleSize(this, 10)">10 GB</button>
+    <button class="chip" onclick="toggleSize(this, 20)">20 GB</button>
+  </div>
+
   <div class="status" id="status"></div>
   <div class="results" id="results"></div>
 
@@ -394,12 +405,33 @@
     }
   });
 
-  let selectedCat = '';
+  let selectedCat  = '';
+  let maxSizeGb    = 0; // 0 = no limit
 
   function toggleCat(el, cat) {
-    document.querySelectorAll('.filter-row .chip').forEach(c => c.classList.remove('on'));
+    document.querySelectorAll('.filter-row:first-of-type .chip').forEach(c => c.classList.remove('on'));
     el.classList.add('on');
     selectedCat = cat;
+  }
+
+  function toggleSize(el, gb) {
+    document.querySelectorAll('.filter-row:last-of-type .chip').forEach(c => c.classList.remove('on'));
+    el.classList.add('on');
+    maxSizeGb = gb;
+  }
+
+  // Parse a size string like "1.8 GB", "811.1 MB", "5.5 GB" into GB float
+  function parseSizeGb(sizeStr) {
+    if (!sizeStr) return null;
+    const match = sizeStr.match(/([\d.]+)\s*(GB|MB|KB|TB)/i);
+    if (!match) return null;
+    const val  = parseFloat(match[1]);
+    const unit = match[2].toUpperCase();
+    if (unit === 'TB') return val * 1024;
+    if (unit === 'GB') return val;
+    if (unit === 'MB') return val / 1024;
+    if (unit === 'KB') return val / (1024 * 1024);
+    return null;
   }
 
   document.getElementById('query').addEventListener('keydown', e => {
@@ -494,19 +526,30 @@ Return ONLY the raw JSON array starting with [ and ending with ]. Nothing else.`
 
       status.className = 'status';
 
-      if (!torrents.length) {
-        status.textContent = `No results found for "${q}"`;
+      // Apply size filter client-side
+      let filtered = torrents;
+      if (maxSizeGb > 0) {
+        filtered = torrents.filter(t => {
+          const gb = parseSizeGb(t.size);
+          return gb === null || gb <= maxSizeGb; // keep unknowns
+        });
+      }
+
+      if (!filtered.length) {
+        const sizeLabel = maxSizeGb > 0 ? ` under ${maxSizeGb >= 1 ? maxSizeGb + ' GB' : (maxSizeGb * 1024) + ' MB'}` : '';
+        status.textContent = `No results found for "${q}"${sizeLabel}`;
         resultsEl.innerHTML = `<div class="empty">
-          <div style="margin-bottom:12px">No results — try a different term or category.</div>
+          <div style="margin-bottom:12px">No results match your filters — try a wider size limit.</div>
           <a href="${searchUrl}" target="_blank" style="color:var(--accent);font-family:var(--mono);font-size:12px;">Open search on 1337x directly ↗</a>
         </div>`;
         btn.disabled = false;
         return;
       }
 
-      status.textContent = `${torrents.length} result${torrents.length !== 1 ? 's' : ''} for "${q}"`;
+      const sizeNote = maxSizeGb > 0 ? ` (size filter: ≤ ${maxSizeGb >= 1 ? maxSizeGb + ' GB' : (maxSizeGb * 1024) + ' MB'}, showing ${filtered.length} of ${torrents.length})` : '';
+      status.textContent = `${filtered.length} result${filtered.length !== 1 ? 's' : ''} for "${q}"${sizeNote}`;
 
-      resultsEl.innerHTML = torrents.map((t, i) => `
+      resultsEl.innerHTML = filtered.map((t, i) => `
         <div class="result-card">
           <div>
             <div class="result-num">#${i + 1}</div>
