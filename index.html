@@ -469,31 +469,27 @@
       return;
     }
 
-    const prompt = `Search Google for torrents on 1337x using this exact query: "1377x.to: ${q}${selectedCat ? ' ' + selectedCat : ''}"
+    const prompt = `Search: 1377x.to: ${q}${selectedCat ? ' ' + selectedCat : ''}
 
-From the search results, extract ALL torrent listings from 1377x.to and return ONLY a raw JSON array — no markdown, no backticks, no explanation.
+Return ONLY a JSON array of the top 10 results from 1377x.to. No explanation, no markdown, no backticks.
 
-Each object must have:
-- "name": full torrent title (string)
-- "url": full 1337x torrent page URL like "https://www.1377x.to/torrent/123/Title/" (string)
-- "seeders": integer, 0 if unknown
-- "leechers": integer, 0 if unknown
-- "size": string like "1.8 GB", empty if unknown
-- "date": upload date string, empty if unknown
-- "uploader": uploader name, empty if unknown
+Each item: {"name":"","url":"https://www.1377x.to/torrent/.../","seeders":0,"leechers":0,"size":""}
 
-Return ONLY the raw JSON array starting with [ and ending with ]. Nothing else.`;
+JSON array only, starting with [`;
 
     try {
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
             tools: [{ google_search: {} }],
-            generationConfig: { temperature: 0.1 }
+            generationConfig: {
+              temperature: 0,
+              maxOutputTokens: 800
+            }
           })
         }
       );
@@ -502,10 +498,10 @@ Return ONLY the raw JSON array starting with [ and ending with ]. Nothing else.`
       if (debugEl) debugEl.textContent = JSON.stringify(data, null, 2);
       if (data.error) throw new Error(data.error.message);
 
-      // Gemini 3.5 Flash returns thought blocks alongside text — filter to text only
+      // Gemini 3.5 Flash puts thoughtSignature on same part as text — just grab all text parts
       const parts = data.candidates?.[0]?.content?.parts || [];
       const text = parts
-        .filter(p => p.text && !p.thought)
+        .filter(p => p.text)
         .map(p => p.text)
         .join('') || '';
 
@@ -557,9 +553,7 @@ Return ONLY the raw JSON array starting with [ and ending with ]. Nothing else.`
               <a href="${escHtml(t.url)}" target="_blank" rel="noopener">${escHtml(t.name)}</a>
             </div>
             <div class="result-meta">
-              ${t.size     ? `<span class="meta-pill size">⬛ ${escHtml(t.size)}</span>` : ''}
-              ${t.date     ? `<span class="meta-pill">🕐 ${escHtml(t.date)}</span>` : ''}
-              ${t.uploader ? `<span class="meta-pill uploader">👤 ${escHtml(t.uploader)}</span>` : ''}
+              ${t.size ? `<span class="meta-pill size">⬛ ${escHtml(t.size)}</span>` : ''}
             </div>
           </div>
           <div class="seeds-leech">
