@@ -470,18 +470,26 @@ Return ONLY the raw JSON array starting with [ and ending with ]. Nothing else.`
       if (debugEl) debugEl.textContent = JSON.stringify(data, null, 2);
       if (data.error) throw new Error(data.error.message);
 
-      const text = data.candidates?.[0]?.content?.parts
-        ?.filter(p => p.text)
-        ?.map(p => p.text)
-        ?.join('') || '';
+      // Gemini 3.5 Flash returns thought blocks alongside text — filter to text only
+      const parts = data.candidates?.[0]?.content?.parts || [];
+      const text = parts
+        .filter(p => p.text && !p.thought)
+        .map(p => p.text)
+        .join('') || '';
+
+      if (!text) throw new Error('Empty response from Gemini — check debug panel');
 
       let torrents = [];
       try {
         const clean = text.replace(/```json|```/g, '').trim();
         const match = clean.match(/\[[\s\S]*\]/);
-        if (match) torrents = JSON.parse(match[0]);
+        if (match) {
+          torrents = JSON.parse(match[0]);
+        } else {
+          throw new Error('No JSON array found in response');
+        }
       } catch(e) {
-        throw new Error('Could not parse results — check debug panel');
+        throw new Error(`Parse failed: ${e.message}`);
       }
 
       status.className = 'status';
@@ -525,10 +533,10 @@ Return ONLY the raw JSON array starting with [ and ending with ]. Nothing else.`
         <div style="margin-bottom:12px">Could not fetch results.</div>
         <a href="${searchUrl}" target="_blank" style="color:var(--accent);font-family:var(--mono);font-size:12px;">Open search on 1337x directly ↗</a>
       </div>`;
-      if (debugEl) debugEl.textContent = err.stack || err.message;
+      if (debugEl) debugEl.textContent = (debugEl.textContent || '') + '\n\nERROR: ' + (err.stack || err.message);
+    } finally {
+      btn.disabled = false;
     }
-
-    btn.disabled = false;
   }
 
   function escHtml(s) {
