@@ -471,11 +471,11 @@
 
     const prompt = `Search: 1377x.to: ${q}${selectedCat ? ' ' + selectedCat : ''}
 
-Return ONLY a JSON array of the top 10 results from 1377x.to. No explanation, no markdown, no backticks.
+Return ONLY a JSON array of the top 10 torrent results from 1377x.to. No text before or after the array.
 
 Each item: {"name":"","url":"https://www.1377x.to/torrent/.../","seeders":0,"leechers":0,"size":""}
 
-JSON array only, starting with [`;
+Exactly 10 items max. JSON array only, starting with [`;
 
     try {
       const response = await fetch(
@@ -488,7 +488,7 @@ JSON array only, starting with [`;
             tools: [{ google_search: {} }],
             generationConfig: {
               temperature: 0,
-              maxOutputTokens: 800,
+              maxOutputTokens: 3000,
               thinkingConfig: { thinkingLevel: 'minimal' }
             }
           })
